@@ -1,0 +1,61 @@
+name: Android Runtime Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      DLL_BUILD_ARCHITECTURES: "aarch64"
+      ANDROID_ABI: arm64-v8a
+      ANDROID_API_LEVEL: "24"
+
+    steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+
+    - name: 🧰 Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          cmake ninja-build meson autoconf automake libtool \
+          pkg-config python3-pip clang llvm jq unzip git build-essential
+
+    - name: 📦 Install Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r26d
+        add-to-path: true
+
+    - name: 🧱 Build cassiaext
+      run: |
+        git clone https://github.com/cassia-org/cassiaext.git
+        mkdir -p cassiaext/build
+        cd cassiaext/build
+        cmake .. \
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+          -DANDROID_ABI=${ANDROID_ABI} \
+          -DANDROID_PLATFORM=android-${ANDROID_API_LEVEL} \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=$PWD/prefix
+        cmake --build . --target install
+
+    - name: 🏗 Build runtime
+      run: |
+        mkdir build
+        cd build
+        cmake .. \
+          -DANDROID=ON \
+          -DCASSIAEXT_BUILD_PATH=$GITHUB_WORKSPACE/cassiaext/build \
+          -DWINETOOLS_PATH=$GITHUB_WORKSPACE/fake/winetools \
+          -DMINGW_SYSROOT_PATH=$GITHUB_WORKSPACE/fake/mingw \
+          -DDLL_BUILD_ARCHITECTURES=${DLL_BUILD_ARCHITECTURES}
+        cmake --build . -- -j$(nproc)
+
+    - name: 📤 Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: cassia-runtime-android
+        path: build/prefix/
