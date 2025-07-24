@@ -13,7 +13,7 @@ jobs:
       ANDROID_API_LEVEL: "24"
 
     steps:
-    - name: 📥 Checkout
+    - name: 📥 Checkout runtime
       uses: actions/checkout@v4
 
     - name: 🧰 Install dependencies
@@ -29,11 +29,13 @@ jobs:
         ndk-version: r26d
         add-to-path: true
 
-    - name: 🧱 Build cassiaext
+    - name: 🧱 Clone and build cassiaext (with submodules)
       run: |
         git clone https://github.com/cassia-org/cassiaext.git
-        mkdir -p cassiaext/build
-        cd cassiaext/build
+        cd cassiaext
+        git submodule update --init --recursive
+        mkdir -p build
+        cd build
         cmake .. \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_ABI=${ANDROID_ABI} \
